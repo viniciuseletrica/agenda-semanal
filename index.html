@@ -126,7 +126,15 @@
         </select>
       </div>
     </div>
-    <div class="row" style="grid-template-columns:1fr 1fr auto;align-items:end;">
+    <div class="row r4">
+      <div>
+        <label>Ritmo (red./hora)</label>
+        <input type="number" id="e-ritmo" placeholder="Ex: 10" min="1" value="10">
+      </div>
+      <div>
+        <label>Valor por texto (R$)</label>
+        <input type="number" id="e-valor" placeholder="Ex: 4,50" min="0" step="0.01">
+      </div>
       <div>
         <label>Entrega no prazo</label>
         <select id="e-entrega" onchange="toggleHoraEntrega()">
@@ -136,13 +144,15 @@
         </select>
       </div>
       <div id="hora-entrega-wrap">
-        <label>Horário limite da entrega</label>
+        <label>Horário limite</label>
         <input type="time" id="e-hora-entrega" value="09:00">
       </div>
-      <button class="btn btn-r" onclick="addE()">+ Adicionar</button>
+    </div>
+    <div style="margin-top:.5rem;">
+      <button class="btn btn-r" onclick="addE()">+ Adicionar escola</button>
     </div>
     <div id="lista-e"></div>
-    <p class="note">📌 No dia do prazo, apenas o bloco <em>antes</em> da entrega será usado para corrigir as redações restantes.</p>
+    <p class="note">📌 No dia do prazo, apenas o bloco <em>antes</em> da entrega será usado. O ritmo e valor são específicos por escola.</p>
   </div>
 
   <!-- COMPROMISSOS -->
@@ -237,19 +247,28 @@ function addE() {
   const nome    = document.getElementById('e-nome').value.trim();
   const qtd     = parseInt(document.getElementById('e-qtd').value);
   const prazo   = document.getElementById('e-prazo').value;
+  const ritmo   = parseFloat(document.getElementById('e-ritmo').value) || 10;
+  const valor   = parseFloat(document.getElementById('e-valor').value) || 0;
   const entrega = document.getElementById('e-entrega').value;
   const hora    = document.getElementById('e-hora-entrega').value;
   if (!nome || !qtd) return alert('Preencha escola e quantidade.');
-  escolas.push({nome, qtd, prazo, entrega, hora});
+  escolas.push({nome, qtd, prazo, ritmo, valor, entrega, hora});
   document.getElementById('e-nome').value = '';
   document.getElementById('e-qtd').value = '';
+  document.getElementById('e-valor').value = '';
   renderE();
 }
+
 function renderE() {
-  const eLabel = {manha:'manhã', tarde:'tarde', qualquer:'qualquer horário'};
-  document.getElementById('lista-e').innerHTML = escolas.map((e,i) =>
-    `<span class="tag tag-e">📝 ${e.nome} — ${e.qtd} red. | prazo: ${e.prazo} | entrega: ${eLabel[e.entrega]}${e.entrega!=='qualquer'?' às '+e.hora:''}
-     <span class="x" onclick="escolas.splice(${i},1);renderE()">×</span></span>`).join('');
+  const eLabel = {manha:'manhã', tarde:'tarde', qualquer:'qualquer'};
+  const fmt = v => v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById('lista-e').innerHTML = escolas.map((e,i) => {
+    const ganho = e.qtd * e.valor;
+    const capManha = Math.round(3.5 * e.ritmo);
+    const capTarde = Math.round(4.5 * e.ritmo);
+    return `<span class="tag tag-e">📝 <strong>${e.nome}</strong> — ${e.qtd} red. | prazo: ${e.prazo} | ${e.ritmo} red./h | R$ ${fmt(e.valor)}/texto${e.valor>0?' | 💰 R$ '+fmt(ganho):''} | entrega: ${eLabel[e.entrega]}${e.entrega!=='qualquer'?' às '+e.hora:''}
+     <span class="x" onclick="escolas.splice(${i},1);renderE()">×</span></span>`;
+  }).join('');
 }
 
 function addC() {
@@ -276,12 +295,13 @@ function gerar() {
 
   if (sel.length === 0) return alert('Selecione pelo menos um dia disponível.');
 
-  // Slots disponíveis por dia: {dia: {manha: capRestante, tarde: capRestante}}
+  // Slots disponíveis por dia — capacidade em horas (não em redações fixas)
+  // pois cada escola tem seu próprio ritmo
   const slots = {};
   DIAS.slice(0,6).forEach(d => {
     slots[d] = {
-      manha: CAP_MANHA,
-      tarde: CAP_TARDE,
+      hManha: 3.5,  // horas disponíveis manhã
+      hTarde: 4.5,  // horas disponíveis tarde
       redManha: [],
       redTarde: [],
       compsManha: [],
@@ -293,12 +313,12 @@ function gerar() {
   // Bloquear slots de compromissos
   comps.forEach(c => {
     if (!slots[c.dia]) return;
-    if (c.bloco === 'manha') { slots[c.dia].manha = 0; slots[c.dia].compsManha.push(c); }
-    else if (c.bloco === 'tarde') { slots[c.dia].tarde = 0; slots[c.dia].compsTarde.push(c); }
+    if (c.bloco === 'manha') { slots[c.dia].hManha = 0; slots[c.dia].compsManha.push(c); }
+    else if (c.bloco === 'tarde') { slots[c.dia].hTarde = 0; slots[c.dia].compsTarde.push(c); }
     else slots[c.dia].compsOutro.push(c);
   });
 
-  // Distribuir redações por escola respeitando prazo e horário de entrega
+  // Distribuir redações por escola respeitando prazo, ritmo e horário de entrega
   escolas.forEach(escola => {
     const prazoIdx = DIAS.indexOf(escola.prazo);
     const dispDias = sel.filter(d => DIAS.indexOf(d) <= prazoIdx);
@@ -312,16 +332,29 @@ function gerar() {
         const ehPrazo = dia === escola.prazo;
         const podeManha = !ehPrazo || escola.entrega === "manha" || escola.entrega === "qualquer";
         const podeTarde = !ehPrazo || escola.entrega === "tarde" || escola.entrega === "qualquer";
-        if (podeManha && slots[dia].manha > 0) {
-          const n = Math.min(restante, slots[dia].manha);
-          slots[dia].redManha.push({escola:escola.nome,qtd:n,prazo:escola.prazo,entrega:escola.entrega,horaEntrega:escola.hora});
-          slots[dia].manha -= n; restante -= n;
+
+        if (podeManha && slots[dia].hManha > 0) {
+          const capManha = Math.floor(slots[dia].hManha * escola.ritmo);
+          const n = Math.min(restante, capManha);
+          if (n > 0) {
+            slots[dia].redManha.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
+              entrega:escola.entrega, horaEntrega:escola.hora,
+              ritmo:escola.ritmo, valor:escola.valor});
+            slots[dia].hManha -= n / escola.ritmo;
+            restante -= n;
+          }
         }
         if (restante <= 0) break;
-        if (podeTarde && slots[dia].tarde > 0) {
-          const n = Math.min(restante, slots[dia].tarde);
-          slots[dia].redTarde.push({escola:escola.nome,qtd:n,prazo:escola.prazo,entrega:escola.entrega,horaEntrega:escola.hora});
-          slots[dia].tarde -= n; restante -= n;
+        if (podeTarde && slots[dia].hTarde > 0) {
+          const capTarde = Math.floor(slots[dia].hTarde * escola.ritmo);
+          const n = Math.min(restante, capTarde);
+          if (n > 0) {
+            slots[dia].redTarde.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
+              entrega:escola.entrega, horaEntrega:escola.hora,
+              ritmo:escola.ritmo, valor:escola.valor});
+            slots[dia].hTarde -= n / escola.ritmo;
+            restante -= n;
+          }
         }
       }
       if (tentativas > 1) break;
@@ -340,6 +373,9 @@ function gerar() {
     ? Math.round(diasComRed.reduce((s,d)=>s+redPorDia[d],0) / diasComRed.length) : 0;
   const maxDia = Math.max(...sel.map(d=>redPorDia[d]), 0);
   const totalRed = escolas.reduce((s,e)=>s+e.qtd,0);
+  const totalGanho = escolas.reduce((s,e)=>s+(e.qtd*e.valor),0);
+  const totalHoras = escolas.reduce((s,e)=>s+(e.qtd/e.ritmo),0);
+  const fmt = v => v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 
   // ALERTAS
   let alertasHTML = '';
@@ -349,6 +385,9 @@ function gerar() {
     alertasHTML += `<div class="alert a-warn">⚠️ <div><strong>Atenção!</strong> Média de <strong>${media} redações/dia</strong> — acima da sua meta de ${meta}. Repense suas demandas semanais.</div></div>`;
   } else if (media > 0) {
     alertasHTML += `<div class="alert a-ok">✅ <div>Média de <strong>${media} redações/dia</strong> nos dias com correção — dentro da meta de ${meta}/dia. Semana viável!</div></div>`;
+  }
+  if (totalGanho > 0) {
+    alertasHTML += `<div class="alert" style="background:#f0faf5;border:1.5px solid #2d6a4f;color:#1a4a30;">💰 <div>Ganho total estimado: <strong>R$ ${fmt(totalGanho)}</strong> em <strong>${fmt(totalHoras)} horas</strong> de correção (R$ ${fmt(totalGanho/totalHoras)}/h médio)</div></div>`;
   }
   document.getElementById('alertas').innerHTML = alertasHTML;
 
@@ -373,7 +412,10 @@ function gerar() {
     if (s.compsManha.length > 0) {
       s.compsManha.forEach(c => bs += `<div class="bl bl-comp"><div class="bl-t">📌 08:30–12:00</div>${c.desc}</div>`);
     } else if (s.redManha.length > 0) {
-      s.redManha.forEach(r => bs += `<div class="bl bl-red-m"><div class="bl-t">✏️ 08:30–12:00</div><strong>${r.escola}</strong> — ${r.qtd} red.${r.prazo===dia?` <em>(entrega ${r.entrega==='manha'?r.horaEntrega:'hoje'})</em>`:''}</div>`);
+      s.redManha.forEach(r => {
+        const ganhoBloco = r.valor > 0 ? ` | 💰 R$ ${fmt(r.qtd*r.valor)}` : '';
+        bs += `<div class="bl bl-red-m"><div class="bl-t">✏️ 08:30–12:00 · ${r.ritmo} red./h${ganhoBloco}</div><strong>${r.escola}</strong> — ${r.qtd} red.${r.prazo===dia?` <em>(entrega ${r.entrega==='manha'?r.horaEntrega:'hoje'})</em>`:''}</div>`;
+      });
     } else {
       bs += `<div class="bl bl-manha"><div class="bl-t">08:30–12:00</div>Manhã livre</div>`;
     }
@@ -382,7 +424,10 @@ function gerar() {
     if (s.compsTarde.length > 0) {
       s.compsTarde.forEach(c => bs += `<div class="bl bl-comp"><div class="bl-t">📌 13:30–18:00</div>${c.desc}</div>`);
     } else if (s.redTarde.length > 0) {
-      s.redTarde.forEach(r => bs += `<div class="bl bl-red-t"><div class="bl-t">✏️ 13:30–18:00</div><strong>${r.escola}</strong> — ${r.qtd} red.${r.prazo===dia?` <em>(entrega ${r.entrega==='tarde'?r.horaEntrega:'hoje'})</em>`:''}</div>`);
+      s.redTarde.forEach(r => {
+        const ganhoBloco = r.valor > 0 ? ` | 💰 R$ ${fmt(r.qtd*r.valor)}` : '';
+        bs += `<div class="bl bl-red-t"><div class="bl-t">✏️ 13:30–18:00 · ${r.ritmo} red./h${ganhoBloco}</div><strong>${r.escola}</strong> — ${r.qtd} red.${r.prazo===dia?` <em>(entrega ${r.entrega==='tarde'?r.horaEntrega:'hoje'})</em>`:''}</div>`;
+      });
     } else {
       bs += `<div class="bl bl-tarde"><div class="bl-t">13:30–18:00</div>Tarde livre</div>`;
     }
@@ -407,7 +452,8 @@ function gerar() {
     <div class="stat">Total redações: <strong>${totalRed}</strong></div>
     <div class="stat">Média/dia: <strong>${media}</strong></div>
     <div class="stat">Máx. em um dia: <strong>${maxDia}</strong></div>
-    <div class="stat">Cap. máx/dia: <strong>80</strong></div>
+    <div class="stat">Horas totais: <strong>${fmt(totalHoras)}h</strong></div>
+    ${totalGanho>0?`<div class="stat">💰 Ganho total: <strong>R$ ${fmt(totalGanho)}</strong></div>`:''}
     <div class="stat">Compromissos: <strong>${comps.length}</strong></div>`;
 
   document.getElementById('resultado').style.display = 'block';
