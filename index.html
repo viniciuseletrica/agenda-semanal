@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agenda Semanal</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{--bg:#f5f0e8;--card:#fffdf7;--ink:#1a1a2e;--soft:#6b6b8a;--accent:#c84b31;--accent2:#2d6a4f;--border:#e0d8c8;--shadow:0 2px 12px rgba(26,26,46,.08);}
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -195,6 +196,7 @@
         <div class="lg"><div class="ld" style="background:#fdf0e8;border:2px solid #e07b39"></div>Correção tarde</div>
         <div class="lg"><div class="ld" style="background:#d8f0e4;border:2px solid #2d6a4f"></div>Compromisso</div>
       </div>
+      <button class="btn btn-main" onclick="baixarPDF()" style="margin-top:1.5rem;">⬇️ Baixar PDF</button>
     </div>
   </div>
 </div>
@@ -410,6 +412,153 @@ function gerar() {
 
   document.getElementById('resultado').style.display = 'block';
   document.getElementById('resultado').scrollIntoView({behavior:'smooth'});
+}
+
+function baixarPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const diasSel = diasSelecionados();
+  const dormir  = document.getElementById('hora-dormir').value || '22:00';
+  const acordar = document.getElementById('hora-acordar').value || '07:00';
+  const meta    = document.getElementById('meta').value || '100';
+
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  let y = 15;
+
+  // Cabeçalho
+  doc.setFillColor(26, 26, 46);
+  doc.rect(0, 0, 210, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Agenda Semanal', 14, 10);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gerado em ${hoje}  |  Sono: ${dormir}–${acordar}  |  Meta: ${meta} red./dia`, 14, 17);
+  y = 30;
+
+  // Stats
+  const statsEl = document.getElementById('stats');
+  const statsTexto = statsEl.innerText.replace(/\n/g, '   ');
+  doc.setTextColor(80, 80, 120);
+  doc.setFontSize(8);
+  doc.text(statsTexto, 14, y);
+  y += 8;
+
+  // Alertas
+  const alertasEl = document.getElementById('alertas');
+  if (alertasEl.innerText.trim()) {
+    doc.setTextColor(120, 60, 0);
+    doc.setFontSize(8);
+    const linhas = doc.splitTextToSize('⚠ ' + alertasEl.innerText.trim(), 182);
+    doc.text(linhas, 14, y);
+    y += linhas.length * 4 + 3;
+  }
+
+  // Linha divisória
+  doc.setDrawColor(220, 216, 200);
+  doc.line(14, y, 196, y);
+  y += 5;
+
+  // Grade dos dias
+  const cores = {
+    sleep: [232, 228, 240],
+    manha_livre: [255, 248, 225],
+    tarde_livre: [227, 242, 253],
+    red_m: [253, 232, 228],
+    red_t: [253, 240, 232],
+    comp: [216, 240, 228],
+    free: [245, 240, 232],
+  };
+
+  const todosOsDias = [...diasSel, 'Domingo'];
+  const colW = 182 / Math.min(todosOsDias.length, 4);
+  let col = 0;
+  let yBase = y;
+
+  todosOsDias.forEach((dia, idx) => {
+    const x = 14 + (col % 4) * colW;
+    if (col > 0 && col % 4 === 0) { yBase = y; }
+    let dy = yBase;
+
+    // Cabeçalho do dia
+    doc.setFillColor(26, 26, 46);
+    if (dia === 'Domingo') doc.setFillColor(155, 142, 196);
+    doc.rect(x, dy, colW - 1, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(dia, x + 2, dy + 4.8);
+
+    // Badge prazo
+    const prazoE = escolas.find(e => e.prazo === dia);
+    if (prazoE) {
+      doc.setFillColor(200, 75, 49);
+      const badgeText = prazoE.entrega !== 'qualquer' ? prazoE.hora : 'prazo';
+      doc.roundedRect(x + colW - 18, dy + 1.5, 16, 4, 1, 1, 'F');
+      doc.setFontSize(5.5);
+      doc.text(badgeText, x + colW - 17, dy + 4.5);
+    }
+    dy += 8;
+
+    // Bloco sono
+    doc.setFillColor(...cores.sleep);
+    doc.rect(x, dy, colW - 1, 6, 'F');
+    doc.setTextColor(74, 61, 107);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`🌙 ${dormir}–${acordar}  Sono`, x + 2, dy + 4);
+    dy += 7;
+
+    if (dia !== 'Domingo') {
+      // Pegar blocos do dia
+      const grade = document.getElementById('grade');
+      const dayEl = Array.from(grade.querySelectorAll('.day-col')).find(el =>
+        el.querySelector('.dh span')?.textContent?.trim() === dia);
+
+      if (dayEl) {
+        dayEl.querySelectorAll('.blocks .bl').forEach(bl => {
+          const texto = bl.innerText.trim();
+          if (!texto) return;
+          let cor = cores.free;
+          if (bl.classList.contains('bl-red-m')) cor = cores.red_m;
+          else if (bl.classList.contains('bl-red-t')) cor = cores.red_t;
+          else if (bl.classList.contains('bl-comp')) cor = cores.comp;
+          else if (bl.classList.contains('bl-manha')) cor = cores.manha_livre;
+          else if (bl.classList.contains('bl-tarde')) cor = cores.tarde_livre;
+
+          const linhas = doc.splitTextToSize(texto.replace(/\n/g, ' '), colW - 5);
+          const h = linhas.length * 4 + 4;
+
+          // Nova página se necessário
+          if (dy + h > 285) {
+            doc.addPage();
+            dy = 15; yBase = 15;
+          }
+
+          doc.setFillColor(...cor);
+          doc.rect(x, dy, colW - 1, h, 'F');
+          doc.setTextColor(40, 40, 60);
+          doc.setFontSize(6);
+          doc.text(linhas, x + 2, dy + 3.5);
+          dy += h + 1;
+        });
+      }
+    } else {
+      doc.setFillColor(...cores.free);
+      doc.rect(x, dy, colW - 1, 7, 'F');
+      doc.setTextColor(100, 100, 130);
+      doc.setFontSize(6.5);
+      doc.text('Descanso total 🌿', x + 2, dy + 4.5);
+      dy += 8;
+    }
+
+    if (dy > y) y = dy;
+    col++;
+  });
+
+  doc.save('agenda_semanal.pdf');
 }
 
 // Inicializar
