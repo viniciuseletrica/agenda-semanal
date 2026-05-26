@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda Semanal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{--bg:#f5f0e8;--card:#fffdf7;--ink:#1a1a2e;--soft:#6b6b8a;--accent:#c84b31;--accent2:#2d6a4f;--border:#e0d8c8;--shadow:0 2px 12px rgba(26,26,46,.08);}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding:2rem 1rem;}
+  h1{font-family:'DM Serif Display',serif;font-size:2.2rem;margin-bottom:.2rem;}
+  .sub{color:var(--soft);font-size:.95rem;margin-bottom:2rem;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  .card{background:var(--card);border-radius:16px;padding:1.5rem;box-shadow:var(--shadow);margin-bottom:1.5rem;border:1px solid var(--border);}
+  .card h2{font-family:'DM Serif Display',serif;font-size:1.2rem;margin-bottom:1rem;}
+  .row{display:grid;gap:.75rem;margin-bottom:.75rem;align-items:end;}
+  .r2{grid-template-columns:1fr 1fr auto;}
+  .r3{grid-template-columns:1fr 1fr 1fr auto;}
+  .r4{grid-template-columns:1fr 1fr 1fr 1fr;}
+  label{display:block;font-size:.78rem;font-weight:600;color:var(--soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem;}
+  input,select{width:100%;padding:.6rem .8rem;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.9rem;background:var(--bg);color:var(--ink);}
+  input:focus,select:focus{outline:none;border-color:var(--accent);}
+  .btn{padding:.6rem 1.2rem;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+  .btn-r{background:var(--accent);color:#fff;}.btn-r:hover{background:#a83a24;transform:translateY(-1px);}
+  .btn-g{background:var(--accent2);color:#fff;}.btn-g:hover{background:#1f4d38;transform:translateY(-1px);}
+  .btn-main{background:var(--ink);color:#fff;padding:.85rem 2.5rem;font-size:1rem;border-radius:12px;display:block;margin:1.5rem auto 0;}
+  .btn-main:hover{background:#2d2d4e;transform:translateY(-2px);}
+  .tag{display:inline-flex;align-items:center;gap:.4rem;background:var(--bg);border:1.5px solid var(--border);border-radius:20px;padding:.3rem .8rem;font-size:.82rem;margin:.25rem;}
+  .tag .x{cursor:pointer;color:var(--soft);}.tag .x:hover{color:var(--accent);}
+  .tag-e{border-color:#c84b31;}.tag-c{border-color:#2d6a4f;}
+  .note{font-size:.78rem;color:var(--soft);margin-top:.4rem;}
+  .info-box{background:#e8f4fd;border:1.5px solid #90caf9;border-radius:10px;padding:.75rem 1rem;font-size:.85rem;color:#1a3a5c;margin-bottom:.75rem;}
+  .alert{border-radius:10px;padding:.75rem 1rem;font-size:.85rem;margin-bottom:.75rem;display:flex;gap:.6rem;align-items:flex-start;}
+  .a-warn{background:#fff3cd;border:1.5px solid #ffc107;color:#7a5c00;}
+  .a-ok{background:#d4edda;border:1.5px solid #28a745;color:#1a4a2a;}
+  .a-danger{background:#fde8e4;border:1.5px solid var(--accent);color:#7a2418;}
+
+  /* CHECK DIAS */
+  .dias-check{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;}
+  .dia-btn{padding:.4rem .9rem;border:1.5px solid var(--border);border-radius:20px;font-size:.82rem;cursor:pointer;background:var(--bg);color:var(--soft);transition:all .2s;user-select:none;}
+  .dia-btn.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .dia-btn.off-range{opacity:.35;pointer-events:none;}
+
+  /* GRADE */
+  .week-grid{display:grid;gap:.75rem;}
+  .day-col{background:var(--bg);border-radius:12px;border:1.5px solid var(--border);overflow:hidden;}
+  .dh{font-weight:600;font-size:.82rem;text-transform:uppercase;color:#fff;background:var(--ink);padding:.5rem .75rem;display:flex;justify-content:space-between;align-items:center;}
+  .dh .badge{background:var(--accent);color:#fff;font-size:.68rem;border-radius:12px;padding:.15rem .5rem;}
+  .day-free .dh{background:#9b8ec4;}
+  .blocks{padding:.5rem;}
+  .bl{border-radius:8px;padding:.45rem .6rem;font-size:.78rem;margin-bottom:.35rem;line-height:1.4;}
+  .bl-t{font-size:.7rem;opacity:.65;margin-bottom:.1rem;}
+  .bl-sleep{background:#e8e4f0;border-left:3px solid #9b8ec4;color:#4a3d6b;}
+  .bl-manha{background:#fff8e1;border-left:3px solid #f9a825;color:#5a3e00;}
+  .bl-tarde{background:#e3f2fd;border-left:3px solid #1976d2;color:#0d3256;}
+  .bl-red-m{background:#fde8e4;border-left:3px solid var(--accent);color:#7a2418;}
+  .bl-red-t{background:#fdf0e8;border-left:3px solid #e07b39;color:#6b3010;}
+  .bl-comp{background:#d8f0e4;border-left:3px solid var(--accent2);color:#1a4a30;}
+  .bl-free{background:#f5f0e8;border-left:3px solid #ccc;color:var(--soft);font-style:italic;font-size:.75rem;}
+  .stats-bar{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;}
+  .stat{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:.4rem .9rem;font-size:.82rem;}
+  .stat strong{color:var(--accent);}
+  .legend{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap;}
+  .lg{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--soft);}
+  .ld{width:10px;height:10px;border-radius:3px;}
+  @media(max-width:600px){.r2,.r3,.r4{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📅 Agenda Semanal</h1>
+  <p class="sub">Prazos, redações e compromissos — distribuídos nos seus blocos de trabalho.</p>
+
+  <!-- CONFIG SEMANA -->
+  <div class="card">
+    <h2>📆 Configuração da semana</h2>
+    <div class="info-box">
+      📊 Capacidade real: <strong>35 red./manhã</strong> (08:30–12:00 = 3,5h × 10/h) + <strong>45 red./tarde</strong> (13:30–18:00 = 4,5h × 10/h) = <strong>80 red./dia</strong> máximo.
+    </div>
+    <div class="row r4">
+      <div>
+        <label>Começar em</label>
+        <select id="dia-inicio" onchange="atualizarDias()">
+          <option value="0">Segunda</option>
+          <option value="1" selected>Terça</option>
+          <option value="2">Quarta</option>
+          <option value="3">Quinta</option>
+          <option value="4">Sexta</option>
+          <option value="5">Sábado</option>
+        </select>
+      </div>
+      <div>
+        <label>Hora de dormir</label>
+        <input type="time" id="hora-dormir" value="22:00">
+      </div>
+      <div>
+        <label>Hora de acordar</label>
+        <input type="time" id="hora-acordar" value="07:00">
+      </div>
+      <div>
+        <label>Incluir sábado?</label>
+        <select id="inc-sab" onchange="atualizarDias()">
+          <option value="nao">Não</option>
+          <option value="sim">Sim</option>
+        </select>
+      </div>
+    </div>
+    <label>Dias disponíveis para correção (clique para ativar/desativar)</label>
+    <div class="dias-check" id="dias-check"></div>
+    <p class="note">💤 Domingo sempre livre. Clique nos dias para ativar ou bloquear.</p>
+  </div>
+
+  <!-- REDAÇÕES -->
+  <div class="card">
+    <h2>📝 Redações para corrigir</h2>
+    <div class="row r3">
+      <div><label>Escola</label><input type="text" id="e-nome" placeholder="Nome da escola"></div>
+      <div><label>Quantidade</label><input type="number" id="e-qtd" placeholder="Ex: 120" min="1"></div>
+      <div>
+        <label>Prazo</label>
+        <select id="e-prazo">
+          <option>Segunda</option><option>Terça</option><option>Quarta</option>
+          <option selected>Quinta</option><option>Sexta</option><option>Sábado</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="grid-template-columns:1fr 1fr auto;align-items:end;">
+      <div>
+        <label>Entrega no prazo</label>
+        <select id="e-entrega" onchange="toggleHoraEntrega()">
+          <option value="manha">Pela manhã</option>
+          <option value="tarde">Pela tarde</option>
+          <option value="qualquer">Qualquer horário</option>
+        </select>
+      </div>
+      <div id="hora-entrega-wrap">
+        <label>Horário limite da entrega</label>
+        <input type="time" id="e-hora-entrega" value="09:00">
+      </div>
+      <button class="btn btn-r" onclick="addE()">+ Adicionar</button>
+    </div>
+    <div id="lista-e"></div>
+    <p class="note">📌 No dia do prazo, apenas o bloco <em>antes</em> da entrega será usado para corrigir as redações restantes.</p>
+  </div>
+
+  <!-- COMPROMISSOS -->
+  <div class="card">
+    <h2>📌 Compromissos</h2>
+    <div class="row r3">
+      <div><label>Descrição</label><input type="text" id="c-desc" placeholder="Ex: Reunião pedagógica"></div>
+      <div><label>Dia</label>
+        <select id="c-dia">
+          <option>Segunda</option><option>Terça</option><option>Quarta</option>
+          <option>Quinta</option><option>Sexta</option><option>Sábado</option>
+        </select>
+      </div>
+      <div><label>Bloco</label>
+        <select id="c-bloco">
+          <option value="manha">Manhã (08:30–12:00)</option>
+          <option value="tarde">Tarde (13:30–18:00)</option>
+          <option value="outro">Outro horário</option>
+        </select>
+      </div>
+      <button class="btn btn-g" onclick="addC()">+ Adicionar</button>
+    </div>
+    <div id="lista-c"></div>
+  </div>
+
+  <!-- META -->
+  <div class="card">
+    <h2>⚙️ Meta diária</h2>
+    <div class="row r4">
+      <div>
+        <label>Meta de redações/dia (alerta)</label>
+        <input type="number" id="meta" value="100" min="1">
+      </div>
+    </div>
+    <p class="note">⚠️ Se a média diária ultrapassar a meta, você será alertado. Capacidade física máxima: 80/dia.</p>
+    <button class="btn btn-main" onclick="gerar()">✨ Montar minha semana</button>
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="resultado" style="display:none">
+    <div class="card">
+      <h2>📋 Sua semana</h2>
+      <div id="alertas"></div>
+      <div class="stats-bar" id="stats"></div>
+      <div class="week-grid" id="grade"></div>
+      <div class="legend">
+        <div class="lg"><div class="ld" style="background:#e8e4f0;border:2px solid #9b8ec4"></div>Sono</div>
+        <div class="lg"><div class="ld" style="background:#fff8e1;border:2px solid #f9a825"></div>Manhã livre</div>
+        <div class="lg"><div class="ld" style="background:#e3f2fd;border:2px solid #1976d2"></div>Tarde livre</div>
+        <div class="lg"><div class="ld" style="background:#fde8e4;border:2px solid #c84b31"></div>Correção manhã</div>
+        <div class="lg"><div class="ld" style="background:#fdf0e8;border:2px solid #e07b39"></div>Correção tarde</div>
+        <div class="lg"><div class="ld" style="background:#d8f0e4;border:2px solid #2d6a4f"></div>Compromisso</div>
+      </div>
+      <button class="btn btn-main" onclick="baixarPDF()" style="margin-top:1.5rem;">⬇️ Baixar PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DIAS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+const CAP_MANHA = 35; // 3.5h x 10
+const CAP_TARDE = 45; // 4.5h x 10
+const escolas = [], comps = [];
+let diasAtivos = ['Terça','Quarta','Quinta','Sexta'];
+
+function atualizarDias() {
+  const ini = parseInt(document.getElementById('dia-inicio').value);
+  const sab = document.getElementById('inc-sab').value === 'sim';
+  const fim = sab ? 6 : 5;
+  diasAtivos = DIAS.slice(ini, fim);
+  const el = document.getElementById('dias-check');
+  el.innerHTML = diasAtivos.map(d =>
+    `<div class="dia-btn on" id="dbtn-${d}" onclick="toggleDia('${d}')">${d}</div>`
+  ).join('') + `<div class="dia-btn off-range">Dom 🌿</div>`;
+}
+
+function toggleDia(d) {
+  const btn = document.getElementById('dbtn-' + d);
+  btn.classList.toggle('on');
+}
+
+function diasSelecionados() {
+  return diasAtivos.filter(d => document.getElementById('dbtn-'+d)?.classList.contains('on'));
+}
+
+function toggleHoraEntrega() {
+  const v = document.getElementById('e-entrega').value;
+  document.getElementById('hora-entrega-wrap').style.display = v === 'qualquer' ? 'none' : 'block';
+}
+
+function addE() {
+  const nome    = document.getElementById('e-nome').value.trim();
+  const qtd     = parseInt(document.getElementById('e-qtd').value);
+  const prazo   = document.getElementById('e-prazo').value;
+  const entrega = document.getElementById('e-entrega').value;
+  const hora    = document.getElementById('e-hora-entrega').value;
+  if (!nome || !qtd) return alert('Preencha escola e quantidade.');
+  escolas.push({nome, qtd, prazo, entrega, hora});
+  document.getElementById('e-nome').value = '';
+  document.getElementById('e-qtd').value = '';
+  renderE();
+}
+function renderE() {
+  const eLabel = {manha:'manhã', tarde:'tarde', qualquer:'qualquer horário'};
+  document.getElementById('lista-e').innerHTML = escolas.map((e,i) =>
+    `<span class="tag tag-e">📝 ${e.nome} — ${e.qtd} red. | prazo: ${e.prazo} | entrega: ${eLabel[e.entrega]}${e.entrega!=='qualquer'?' às '+e.hora:''}
+     <span class="x" onclick="escolas.splice(${i},1);renderE()">×</span></span>`).join('');
+}
+
+function addC() {
+  const desc  = document.getElementById('c-desc').value.trim();
+  const dia   = document.getElementById('c-dia').value;
+  const bloco = document.getElementById('c-bloco').value;
+  if (!desc) return alert('Descreva o compromisso.');
+  comps.push({desc, dia, bloco});
+  document.getElementById('c-desc').value = '';
+  renderC();
+}
+function renderC() {
+  const bLabel = {manha:'manhã',tarde:'tarde',outro:'outro horário'};
+  document.getElementById('lista-c').innerHTML = comps.map((c,i) =>
+    `<span class="tag tag-c">📌 ${c.desc} — ${c.dia} (${bLabel[c.bloco]})
+     <span class="x" onclick="comps.splice(${i},1);renderC()">×</span></span>`).join('');
+}
+
+function gerar() {
+  const dormir  = document.getElementById('hora-dormir').value || '22:00';
+  const acordar = document.getElementById('hora-acordar').value || '07:00';
+  const meta    = parseInt(document.getElementById('meta').value) || 100;
+  const sel     = diasSelecionados();
+
+  if (sel.length === 0) return alert('Selecione pelo menos um dia disponível.');
+
+  // Slots disponíveis por dia: {dia: {manha: capRestante, tarde: capRestante}}
+  const slots = {};
+  DIAS.slice(0,6).forEach(d => {
+    slots[d] = {
+      manha: CAP_MANHA,
+      tarde: CAP_TARDE,
+      redManha: [],
+      redTarde: [],
+      compsManha: [],
+      compsTarde: [],
+      compsOutro: []
+    };
+  });
+
+  // Bloquear slots de compromissos
+  comps.forEach(c => {
+    if (!slots[c.dia]) return;
+    if (c.bloco === 'manha') { slots[c.dia].manha = 0; slots[c.dia].compsManha.push(c); }
+    else if (c.bloco === 'tarde') { slots[c.dia].tarde = 0; slots[c.dia].compsTarde.push(c); }
+    else slots[c.dia].compsOutro.push(c);
+  });
+
+  // Distribuir redações por escola respeitando prazo e horário de entrega
+  escolas.forEach(escola => {
+    const prazoIdx = DIAS.indexOf(escola.prazo);
+    const dispDias = sel.filter(d => DIAS.indexOf(d) <= prazoIdx);
+    if (dispDias.length === 0) return;
+    let restante = escola.qtd;
+    let tentativas = 0;
+    while (restante > 0 && tentativas < 200) {
+      tentativas++;
+      for (const dia of dispDias) {
+        if (restante <= 0) break;
+        const ehPrazo = dia === escola.prazo;
+        const podeManha = !ehPrazo || escola.entrega === "manha" || escola.entrega === "qualquer";
+        const podeTarde = !ehPrazo || escola.entrega === "tarde" || escola.entrega === "qualquer";
+        if (podeManha && slots[dia].manha > 0) {
+          const n = Math.min(restante, slots[dia].manha);
+          slots[dia].redManha.push({escola:escola.nome,qtd:n,prazo:escola.prazo,entrega:escola.entrega,horaEntrega:escola.hora});
+          slots[dia].manha -= n; restante -= n;
+        }
+        if (restante <= 0) break;
+        if (podeTarde && slots[dia].tarde > 0) {
+          const n = Math.min(restante, slots[dia].tarde);
+          slots[dia].redTarde.push({escola:escola.nome,qtd:n,prazo:escola.prazo,entrega:escola.entrega,horaEntrega:escola.hora});
+          slots[dia].tarde -= n; restante -= n;
+        }
+      }
+      if (tentativas > 1) break;
+    }
+  });
+
+  // Calcular totais
+  const redPorDia = {};
+  sel.forEach(d => {
+    const rm = slots[d].redManha.reduce((s,r)=>s+r.qtd,0);
+    const rt = slots[d].redTarde.reduce((s,r)=>s+r.qtd,0);
+    redPorDia[d] = rm + rt;
+  });
+  const diasComRed = sel.filter(d => redPorDia[d] > 0);
+  const media = diasComRed.length > 0
+    ? Math.round(diasComRed.reduce((s,d)=>s+redPorDia[d],0) / diasComRed.length) : 0;
+  const maxDia = Math.max(...sel.map(d=>redPorDia[d]), 0);
+  const totalRed = escolas.reduce((s,e)=>s+e.qtd,0);
+
+  // ALERTAS
+  let alertasHTML = '';
+  if (maxDia > 80) {
+    alertasHTML += `<div class="alert a-danger">⚠️ <div><strong>Capacidade física ultrapassada!</strong> Em pelo menos um dia seriam necessárias <strong>${maxDia} redações</strong> — além das 80 possíveis em um dia completo. Redistribua os prazos ou reduza a demanda.</div></div>`;
+  } else if (media > meta) {
+    alertasHTML += `<div class="alert a-warn">⚠️ <div><strong>Atenção!</strong> Média de <strong>${media} redações/dia</strong> — acima da sua meta de ${meta}. Repense suas demandas semanais.</div></div>`;
+  } else if (media > 0) {
+    alertasHTML += `<div class="alert a-ok">✅ <div>Média de <strong>${media} redações/dia</strong> nos dias com correção — dentro da meta de ${meta}/dia. Semana viável!</div></div>`;
+  }
+  document.getElementById('alertas').innerHTML = alertasHTML;
+
+  // GRADE
+  const todosOsDias = [...sel, 'Domingo'];
+  const grade = document.getElementById('grade');
+  grade.style.gridTemplateColumns = `repeat(${Math.min(todosOsDias.length, 4)}, 1fr)`;
+
+  let html = '';
+  sel.forEach(dia => {
+    const s = slots[dia];
+    const temPrazo = escolas.some(e => e.prazo === dia);
+    const prazoInfo = escolas.find(e => e.prazo === dia);
+    const entregaLabel = prazoInfo
+      ? (prazoInfo.entrega === 'manha' ? `📅 entrega ${prazoInfo.hora}`
+       : prazoInfo.entrega === 'tarde' ? `📅 entrega ${prazoInfo.hora}`
+       : '📅 prazo') : '';
+    const badge = temPrazo ? `<span class="badge">${entregaLabel}</span>` : '';
+    let bs = `<div class="bl bl-sleep"><div class="bl-t">🌙 ${dormir}–${acordar}</div>Sono</div>`;
+
+    // Manhã
+    if (s.compsManha.length > 0) {
+      s.compsManha.forEach(c => bs += `<div class="bl bl-comp"><div class="bl-t">📌 08:30–12:00</div>${c.desc}</div>`);
+    } else if (s.redManha.length > 0) {
+      s.redManha.forEach(r => bs += `<div class="bl bl-red-m"><div class="bl-t">✏️ 08:30–12:00</div><strong>${r.escola}</strong> — ${r.qtd} red.${r.prazo===dia?` <em>(entrega ${r.entrega==='manha'?r.horaEntrega:'hoje'})</em>`:''}</div>`);
+    } else {
+      bs += `<div class="bl bl-manha"><div class="bl-t">08:30–12:00</div>Manhã livre</div>`;
+    }
+
+    // Tarde
+    if (s.compsTarde.length > 0) {
+      s.compsTarde.forEach(c => bs += `<div class="bl bl-comp"><div class="bl-t">📌 13:30–18:00</div>${c.desc}</div>`);
+    } else if (s.redTarde.length > 0) {
+      s.redTarde.forEach(r => bs += `<div class="bl bl-red-t"><div class="bl-t">✏️ 13:30–18:00</div><strong>${r.escola}</strong> — ${r.qtd} red.${r.prazo===dia?` <em>(entrega ${r.entrega==='tarde'?r.horaEntrega:'hoje'})</em>`:''}</div>`);
+    } else {
+      bs += `<div class="bl bl-tarde"><div class="bl-t">13:30–18:00</div>Tarde livre</div>`;
+    }
+
+    // Outros compromissos
+    s.compsOutro.forEach(c => bs += `<div class="bl bl-comp"><div class="bl-t">📌</div>${c.desc}</div>`);
+
+    html += `<div class="day-col"><div class="dh"><span>${dia}</span>${badge}</div><div class="blocks">${bs}</div></div>`;
+  });
+
+  // Domingo
+  html += `<div class="day-col day-free"><div class="dh"><span>Domingo</span><span style="font-size:.7rem;opacity:.7">sempre livre</span></div>
+    <div class="blocks">
+      <div class="bl bl-sleep"><div class="bl-t">🌙 ${dormir}–${acordar}</div>Sono</div>
+      <div class="bl bl-free">Descanso total 🌿</div>
+    </div></div>`;
+
+  grade.innerHTML = html;
+
+  // STATS
+  document.getElementById('stats').innerHTML = `
+    <div class="stat">Total redações: <strong>${totalRed}</strong></div>
+    <div class="stat">Média/dia: <strong>${media}</strong></div>
+    <div class="stat">Máx. em um dia: <strong>${maxDia}</strong></div>
+    <div class="stat">Cap. máx/dia: <strong>80</strong></div>
+    <div class="stat">Compromissos: <strong>${comps.length}</strong></div>`;
+
+  document.getElementById('resultado').style.display = 'block';
+  document.getElementById('resultado').scrollIntoView({behavior:'smooth'});
+}
+
+function baixarPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const diasSel = diasSelecionados();
+  const dormir  = document.getElementById('hora-dormir').value || '22:00';
+  const acordar = document.getElementById('hora-acordar').value || '07:00';
+  const meta    = document.getElementById('meta').value || '100';
+
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  let y = 15;
+
+  // Cabeçalho
+  doc.setFillColor(26, 26, 46);
+  doc.rect(0, 0, 210, 22, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Agenda Semanal', 14, 10);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gerado em ${hoje}  |  Sono: ${dormir}–${acordar}  |  Meta: ${meta} red./dia`, 14, 17);
+  y = 30;
+
+  // Stats
+  const statsEl = document.getElementById('stats');
+  const statsTexto = statsEl.innerText.replace(/\n/g, '   ');
+  doc.setTextColor(80, 80, 120);
+  doc.setFontSize(8);
+  doc.text(statsTexto, 14, y);
+  y += 8;
+
+  // Alertas
+  const alertasEl = document.getElementById('alertas');
+  if (alertasEl.innerText.trim()) {
+    doc.setTextColor(120, 60, 0);
+    doc.setFontSize(8);
+    const linhas = doc.splitTextToSize('⚠ ' + alertasEl.innerText.trim(), 182);
+    doc.text(linhas, 14, y);
+    y += linhas.length * 4 + 3;
+  }
+
+  // Linha divisória
+  doc.setDrawColor(220, 216, 200);
+  doc.line(14, y, 196, y);
+  y += 5;
+
+  // Grade dos dias
+  const cores = {
+    sleep: [232, 228, 240],
+    manha_livre: [255, 248, 225],
+    tarde_livre: [227, 242, 253],
+    red_m: [253, 232, 228],
+    red_t: [253, 240, 232],
+    comp: [216, 240, 228],
+    free: [245, 240, 232],
+  };
+
+  const todosOsDias = [...diasSel, 'Domingo'];
+  const colW = 182 / Math.min(todosOsDias.length, 4);
+  let col = 0;
+  let yBase = y;
+
+  todosOsDias.forEach((dia, idx) => {
+    const x = 14 + (col % 4) * colW;
+    if (col > 0 && col % 4 === 0) { yBase = y; }
+    let dy = yBase;
+
+    // Cabeçalho do dia
+    doc.setFillColor(26, 26, 46);
+    if (dia === 'Domingo') doc.setFillColor(155, 142, 196);
+    doc.rect(x, dy, colW - 1, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(dia, x + 2, dy + 4.8);
+
+    // Badge prazo
+    const prazoE = escolas.find(e => e.prazo === dia);
+    if (prazoE) {
+      doc.setFillColor(200, 75, 49);
+      const badgeText = prazoE.entrega !== 'qualquer' ? prazoE.hora : 'prazo';
+      doc.roundedRect(x + colW - 18, dy + 1.5, 16, 4, 1, 1, 'F');
+      doc.setFontSize(5.5);
+      doc.text(badgeText, x + colW - 17, dy + 4.5);
+    }
+    dy += 8;
+
+    // Bloco sono
+    doc.setFillColor(...cores.sleep);
+    doc.rect(x, dy, colW - 1, 6, 'F');
+    doc.setTextColor(74, 61, 107);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`🌙 ${dormir}–${acordar}  Sono`, x + 2, dy + 4);
+    dy += 7;
+
+    if (dia !== 'Domingo') {
+      // Pegar blocos do dia
+      const grade = document.getElementById('grade');
+      const dayEl = Array.from(grade.querySelectorAll('.day-col')).find(el =>
+        el.querySelector('.dh span')?.textContent?.trim() === dia);
+
+      if (dayEl) {
+        dayEl.querySelectorAll('.blocks .bl').forEach(bl => {
+          const texto = bl.innerText.trim();
+          if (!texto) return;
+          let cor = cores.free;
+          if (bl.classList.contains('bl-red-m')) cor = cores.red_m;
+          else if (bl.classList.contains('bl-red-t')) cor = cores.red_t;
+          else if (bl.classList.contains('bl-comp')) cor = cores.comp;
+          else if (bl.classList.contains('bl-manha')) cor = cores.manha_livre;
+          else if (bl.classList.contains('bl-tarde')) cor = cores.tarde_livre;
+
+          const linhas = doc.splitTextToSize(texto.replace(/\n/g, ' '), colW - 5);
+          const h = linhas.length * 4 + 4;
+
+          // Nova página se necessário
+          if (dy + h > 285) {
+            doc.addPage();
+            dy = 15; yBase = 15;
+          }
+
+          doc.setFillColor(...cor);
+          doc.rect(x, dy, colW - 1, h, 'F');
+          doc.setTextColor(40, 40, 60);
+          doc.setFontSize(6);
+          doc.text(linhas, x + 2, dy + 3.5);
+          dy += h + 1;
+        });
+      }
+    } else {
+      doc.setFillColor(...cores.free);
+      doc.rect(x, dy, colW - 1, 7, 'F');
+      doc.setTextColor(100, 100, 130);
+      doc.setFontSize(6.5);
+      doc.text('Descanso total 🌿', x + 2, dy + 4.5);
+      dy += 8;
+    }
+
+    if (dy > y) y = dy;
+    col++;
+  });
+
+  doc.save('agenda_semanal.pdf');
+}
+
+// Inicializar
+atualizarDias();
+</script>
+</body>
+</html>
