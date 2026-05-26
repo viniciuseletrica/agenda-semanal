@@ -324,40 +324,79 @@ function gerar() {
     const dispDias = sel.filter(d => DIAS.indexOf(d) <= prazoIdx);
     if (dispDias.length === 0) return;
     let restante = escola.qtd;
-    let tentativas = 0;
-    while (restante > 0 && tentativas < 200) {
-      tentativas++;
-      for (const dia of dispDias) {
-        if (restante <= 0) break;
-        const ehPrazo = dia === escola.prazo;
-        const podeManha = !ehPrazo || escola.entrega === "manha" || escola.entrega === "qualquer";
-        const podeTarde = !ehPrazo || escola.entrega === "tarde" || escola.entrega === "qualquer";
 
-        if (podeManha && slots[dia].hManha > 0) {
-          const capManha = Math.floor(slots[dia].hManha * escola.ritmo);
-          const n = Math.min(restante, capManha);
-          if (n > 0) {
-            slots[dia].redManha.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
-              entrega:escola.entrega, horaEntrega:escola.hora,
-              ritmo:escola.ritmo, valor:escola.valor});
-            slots[dia].hManha -= n / escola.ritmo;
-            restante -= n;
-          }
-        }
-        if (restante <= 0) break;
-        if (podeTarde && slots[dia].hTarde > 0) {
-          const capTarde = Math.floor(slots[dia].hTarde * escola.ritmo);
-          const n = Math.min(restante, capTarde);
-          if (n > 0) {
-            slots[dia].redTarde.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
-              entrega:escola.entrega, horaEntrega:escola.hora,
-              ritmo:escola.ritmo, valor:escola.valor});
-            slots[dia].hTarde -= n / escola.ritmo;
-            restante -= n;
-          }
+    // Calcular capacidade total disponível nos dias até o prazo
+    const capTotal = dispDias.reduce((s, dia) => {
+      const ehPrazo = dia === escola.prazo;
+      const podeManha = !ehPrazo || escola.entrega === "manha" || escola.entrega === "qualquer";
+      const podeTarde = !ehPrazo || escola.entrega === "tarde" || escola.entrega === "qualquer";
+      let cap = 0;
+      if (podeManha) cap += Math.floor(slots[dia].hManha * escola.ritmo);
+      if (podeTarde) cap += Math.floor(slots[dia].hTarde * escola.ritmo);
+      return s + cap;
+    }, 0);
+
+    // Meta por dia: distribuição equilibrada
+    const metaPorDia = capTotal > 0 ? Math.ceil(escola.qtd / dispDias.length) : 0;
+
+    // Primeira passagem: distribuir equilibradamente (até metaPorDia por dia)
+    for (const dia of dispDias) {
+      if (restante <= 0) break;
+      const ehPrazo = dia === escola.prazo;
+      const podeManha = !ehPrazo || escola.entrega === "manha" || escola.entrega === "qualquer";
+      const podeTarde = !ehPrazo || escola.entrega === "tarde" || escola.entrega === "qualquer";
+      let restanteDia = Math.min(restante, metaPorDia);
+
+      if (podeManha && slots[dia].hManha > 0 && restanteDia > 0) {
+        const cap = Math.floor(slots[dia].hManha * escola.ritmo);
+        const n = Math.min(restanteDia, cap);
+        if (n > 0) {
+          slots[dia].redManha.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
+            entrega:escola.entrega, horaEntrega:escola.hora, ritmo:escola.ritmo, valor:escola.valor});
+          slots[dia].hManha -= n / escola.ritmo;
+          restante -= n; restanteDia -= n;
         }
       }
-      if (tentativas > 1) break;
+      if (podeTarde && slots[dia].hTarde > 0 && restanteDia > 0) {
+        const cap = Math.floor(slots[dia].hTarde * escola.ritmo);
+        const n = Math.min(restanteDia, cap);
+        if (n > 0) {
+          slots[dia].redTarde.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
+            entrega:escola.entrega, horaEntrega:escola.hora, ritmo:escola.ritmo, valor:escola.valor});
+          slots[dia].hTarde -= n / escola.ritmo;
+          restante -= n;
+        }
+      }
+    }
+
+    // Segunda passagem: alocar o que sobrou nos dias com capacidade restante
+    for (const dia of dispDias) {
+      if (restante <= 0) break;
+      const ehPrazo = dia === escola.prazo;
+      const podeManha = !ehPrazo || escola.entrega === "manha" || escola.entrega === "qualquer";
+      const podeTarde = !ehPrazo || escola.entrega === "tarde" || escola.entrega === "qualquer";
+
+      if (podeManha && slots[dia].hManha > 0) {
+        const cap = Math.floor(slots[dia].hManha * escola.ritmo);
+        const n = Math.min(restante, cap);
+        if (n > 0) {
+          slots[dia].redManha.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
+            entrega:escola.entrega, horaEntrega:escola.hora, ritmo:escola.ritmo, valor:escola.valor});
+          slots[dia].hManha -= n / escola.ritmo;
+          restante -= n;
+        }
+      }
+      if (restante <= 0) break;
+      if (podeTarde && slots[dia].hTarde > 0) {
+        const cap = Math.floor(slots[dia].hTarde * escola.ritmo);
+        const n = Math.min(restante, cap);
+        if (n > 0) {
+          slots[dia].redTarde.push({escola:escola.nome, qtd:n, prazo:escola.prazo,
+            entrega:escola.entrega, horaEntrega:escola.hora, ritmo:escola.ritmo, valor:escola.valor});
+          slots[dia].hTarde -= n / escola.ritmo;
+          restante -= n;
+        }
+      }
     }
   });
 
